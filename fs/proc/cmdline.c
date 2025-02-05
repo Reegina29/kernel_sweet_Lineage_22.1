@@ -4,6 +4,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
+
 #if defined (CONFIG_INITRAMFS_IGNORE_SKIP_FLAG) \
 	|| defined(CONFIG_CMDLINE_HWC_IS_SKU) \
 	|| defined(CONFIG_CMDLINE_HWC_IS_PRODUCT_SKU)
@@ -69,13 +70,26 @@ static void proc_command_line_init(void) {
     }
 #endif
 }
+
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+extern int susfs_spoof_cmdline_or_bootconfig(struct seq_file *m);
+>>>>>>> 2ea6972f1d9c6 (fs: Implement SUSFS v1.5.5)
 #endif
 
 static int cmdline_proc_show(struct seq_file *m, void *v)
 {
+
 #ifdef ALTER_CMDLINE
 	seq_printf(m, "%s\n", proc_command_line);
 #else
+
+#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+		seq_putc(m, '\n');
+		return 0;
+	}
+#endif
+
 	seq_printf(m, "%s\n", saved_command_line);
 #endif
 	return 0;
