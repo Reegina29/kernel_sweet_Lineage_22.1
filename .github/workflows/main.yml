@@ -1,0 +1,85 @@
+name: Building 
+
+on:
+  workflow_dispatch:
+   
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+        
+    - name: Get Date
+      id: rundate
+      run: sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && echo "REPO_DATE=`date`" >> $GITHUB_OUTPUT
+    
+    - name: Checkout Code 
+      uses: actions/checkout@v4
+
+    - name: Fetch Toolchains
+      run: | 
+         mkdir clang && curl https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz -RLO && tar -C clang/ -xf clang-*.tar.gz
+         git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 GCC_ARM64
+         git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 GCC_ARM32
+         
+#    - name: MIUI DISPLAY SELECTED 
+#      run: |
+#         sed -i 's/qcom,mdss-pan-physical-width-dimension = <69>;$/qcom,mdss-pan-physical-width-dimension = <695>;/' arch/arm64/boot/dts/qcom/xiaomi/sweet/dsi-panel-k6-38-0c-0a-fhd-dsc-video.dtsi
+#         sed -i 's/qcom,mdss-pan-physical-height-dimension = <154>;$/qcom,mdss-pan-physical-height-dimension = <1546>;/' arch/arm64/boot/dts/qcom/xiaomi/sweet/dsi-panel-k6-38-0c-0a-fhd-dsc-video.dtsi
+         
+    - name: AOSP Dimensi Selected 
+      run: |
+        sed -i 's/qcom,mdss-pan-physical-width-dimension = <695>;$/qcom,mdss-pan-physical-width-dimension = <69>;/' arch/arm64/boot/dts/qcom/xiaomi/sweet/dsi-panel-k6-38-0c-0a-fhd-dsc-video.dtsi
+        sed -i 's/qcom,mdss-pan-physical-height-dimension = <1546>;$/qcom,mdss-pan-physical-height-dimension = <154>;/' arch/arm64/boot/dts/qcom/xiaomi/sweet/dsi-panel-k6-38-0c-0a-fhd-dsc-video.dtsi
+
+    - name: START BUILDING 
+      run: |  
+          export ARCH=arm64
+          export BUILD_START=`date`
+          export PATH="${PWD}/clang/bin:${PATH}"        
+          export KBUILD_BUILD_USER=Building 
+          export KBUILD_BUILD_HOST=Reegina29 
+          export KBUILD_COMPILER_STRING="${PWD}/clang"                  
+          make O=out ARCH=arm64 sweet_defconfig     
+          make -j$(nproc --all) O=out LLVM=1 LLVM_IAS=1 \
+          ARCH=arm64 \
+          CC=clang \
+          LD=ld.lld \
+          AR=llvm-ar \
+          AS=llvm-as \
+          NM=llvm-nm \
+          STRIP=llvm-strip \
+          OBJCOPY=llvm-objcopy \
+          OBJDUMP=llvm-objdump \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=${PWD}/GCC_ARM64/bin/aarch64-linux-android- \
+          CROSS_COMPILE_ARM32=${PWD}/GCC_ARM32/bin/arm-linux-androideabi-
+          
+    - name: PACKAGE IMAGE
+      run: |
+          if [ ! -d "AnyKernel3" ]; then
+          git clone  --depth=1 https://github.com/basamaryan/AnyKernel3 -b master 
+          fi
+          sed -i "s/kernel\.string=.*/kernel.string=Kernel By @Reegina80/" AnyKernel3/anykernel.sh
+          sed -i "s/device\.name1=.*/device.name1=sweet/" AnyKernel3/anykernel.sh
+          sed -i "s/device\.name2=.*/device.name2=sweetin/" AnyKernel3/anykernel.sh
+          sed -i "s/supported\.versions=.*/supported.versions=11-15/" AnyKernel3/anykernel.sh
+          if [ -f out/arch/arm64/boot/Image.gz ]; then
+            cp out/arch/arm64/boot/Image.gz AnyKernel3/Image.gz
+          fi
+          if [ -f out/arch/arm64/boot/dtbo.img ]; then
+            cp out/arch/arm64/boot/dtbo.img AnyKernel3/dtbo.img
+          fi
+          if [ -f out/arch/arm64/boot/dtb.img ]; then
+            cp out/arch/arm64/boot/dtb.img AnyKernel3/dtb.img
+          fi
+
+    - name: UPLOAD IMAGE 
+      uses: actions/upload-artifact@v4
+      with:
+       name: AnyKernel3-AOSP
+       path: AnyKernel3/*      
+       compression-level: 9
+        
+
+
+        
