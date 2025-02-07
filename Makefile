@@ -388,7 +388,6 @@ endif
 
 # Make variables (CC, etc...)
 CPP		= $(CC) -E
-<<<<<<< HEAD
 ifneq ($(LLVM),)
 CC		= clang
 LD		= ld.lld
